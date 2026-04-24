@@ -73,3 +73,41 @@
 - [x] root layout の icons / manifest / viewport（themeColor） 設定
 - [x] WakeLock API の実装（record page で録音中スリープ防止）
 - [ ] Android Chrome 実機動作確認（ユーザーテスト待ち）
+
+## Phase 7: 再実行機能の強化（2026-04-24）
+- [x] セッション詳細で「文字起こし再実行」ボタンを常時表示
+  - 条件を `failed || stuck` から `!isBusy && audioBlobUrl` に緩和
+  - 完了でも結果が不満/空のときに再実行できるように
+  - 対象: `src/app/(app)/sessions/[id]/page.tsx`
+- [x] 既存結果がある場合は `window.confirm()` で上書き確認
+  - `RetryTranscribeButton` に `hasExisting` prop 追加
+  - 対象: `src/components/session/RetryTranscribeButton.tsx`
+- [x] `status=ready` で結果が空のケース用の警告メッセージを表示
+- [x] Gemini 自動フォールバックの強化（503/500/overloaded/high demand/deadline を追加）
+  - 対象: `src/lib/gemini.ts` の `isFallbackError()`
+- [x] ローカル dev で動作確認（Chrome DevTools MCP 経由）
+- [x] 本番 Vercel にデプロイ（v0.2.9、textup-five.vercel.app）
+- [x] 本番で失敗状態セッションでの再実行フロー確認
+  - 本番テスト用セッション ID: `eb2275ee-a2a9-4d80-a57c-bab9dbb20dc1`
+  - 再実行ボタン→API発火→全モデルフォールバック は動作確認済み
+  - 503フォールバックも実動作確認
+
+## 今後の課題（次回以降）
+
+### 文字起こし系
+- [ ] Gemini 無料枠（limit: 0 / 429）が頻発。解消策を検討:
+  - 候補モデル順を「現実に動くモデル優先」に並び替え（gemini-2.5-flash → gemini-2.5-pro → gemini-2.0-flash）
+  - 404 を常に返すモデル（gemini-3.5-flash, 3.0-flash, 2.0-flash-exp, 1.5-flash, 1.5-flash-latest）を候補から除外
+  - ListModels で利用可能モデルを動的に取得する案も
+  - 有料プランへの切替は別途検討
+- [ ] Gemini 429 の `retryDelay` を尊重して指数バックオフ付きリトライを実装
+- [ ] 再実行中の重複 POST 防止（現状は `busy` state のみ、サーバー側で `processing` 中の rate limit は未実装）
+- [ ] retry count / 履歴の可視化
+
+### UI/UX
+- [ ] 一覧（dashboard）から「失敗」セッションの直接再実行
+- [ ] エラー詳細（Gemini のエラー原因）をユーザーに分かりやすく表示
+  - 現状: 生のスタックトレースがトーストに出る → 「API 無料枠超過」「一時的な高負荷」などの要約を出したい
+
+### PWA
+- [ ] Android Chrome 実機動作確認（Phase 6 から持ち越し）
