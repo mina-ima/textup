@@ -47,7 +47,17 @@ function isFallbackError(err: unknown): boolean {
     msg.includes('permission') ||
     msg.includes('unsupported') ||
     msg.includes('429') ||
-    msg.includes('403')
+    msg.includes('403') ||
+    // 一時的なサーバーエラー / 高負荷 → 別モデルで試す
+    msg.includes('503') ||
+    msg.includes('service unavailable') ||
+    msg.includes('overloaded') ||
+    msg.includes('high demand') ||
+    msg.includes('500') ||
+    msg.includes('internal error') ||
+    msg.includes('502') ||
+    msg.includes('504') ||
+    msg.includes('deadline')
   );
 }
 
