@@ -63,9 +63,10 @@ export default async function SessionPage({
   const isStuck =
     item.status === 'processing' &&
     Date.now() - new Date(item.updatedAt).getTime() > stuckThresholdMs;
-  const canRetryTranscribe =
-    !!item.audioBlobUrl &&
-    (item.status === 'failed' || isStuck);
+  // 処理中でなく音声がある限り、いつでも再実行できる（結果が空/不満な場合にも対応）
+  const canRetryTranscribe = !!item.audioBlobUrl && !isBusy;
+  const isEmptyReady =
+    item.status === 'ready' && segments.length === 0;
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 space-y-4">
@@ -118,9 +119,22 @@ export default async function SessionPage({
               文字起こしに失敗しました。再実行するか、時間をおいて再度お試しください。
             </div>
           )}
+          {isEmptyReady && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
+              <p className="font-medium text-amber-700 dark:text-amber-300">
+                文字起こし結果が空でした
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                無音や短すぎる音声の可能性があります。必要なら再実行できます。
+              </p>
+            </div>
+          )}
           {canRetryTranscribe && (
             <div>
-              <RetryTranscribeButton sessionId={id} />
+              <RetryTranscribeButton
+                sessionId={id}
+                hasExisting={segments.length > 0}
+              />
             </div>
           )}
         </CardContent>
@@ -158,13 +172,6 @@ export default async function SessionPage({
         </Card>
       )}
 
-      {!isBusy && segments.length === 0 && item.status === 'ready' && (
-        <Card>
-          <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            文字起こし結果が空でした
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

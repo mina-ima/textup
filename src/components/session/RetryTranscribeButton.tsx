@@ -10,17 +10,26 @@ type Props = {
   sessionId: string;
   label?: string;
   variant?: 'default' | 'outline';
+  /** 既存の文字起こし結果があるかどうか（上書き確認に使用） */
+  hasExisting?: boolean;
 };
 
 export function RetryTranscribeButton({
   sessionId,
   label = '文字起こしを再実行',
   variant = 'outline',
+  hasExisting = false,
 }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
   const handleClick = async () => {
+    if (hasExisting) {
+      const ok = window.confirm(
+        '既存の文字起こし結果は上書きされます。再実行しますか？',
+      );
+      if (!ok) return;
+    }
     setBusy(true);
     try {
       const res = await fetch(`/api/transcribe/${sessionId}`, {
