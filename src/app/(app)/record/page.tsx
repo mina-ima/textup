@@ -11,6 +11,7 @@ import { RecordingSettings } from '@/components/recorder/RecordingSettings';
 import { RecorderControls } from '@/components/recorder/RecorderControls';
 import { AudioLevelMeter } from '@/components/recorder/AudioLevelMeter';
 import { useRecorder } from '@/features/recording/useRecorder';
+import { convertToWav } from '@/features/recording/encodeWav';
 import type { RecordingMode } from '@/features/recording/types';
 
 function formatTime(ms: number): string {
@@ -58,6 +59,7 @@ export default function RecordPage() {
   // アップロード失敗時の保持Blob（通信断から復帰後の再試行用）
   const [pendingBlob, setPendingBlob] = useState<Blob | null>(null);
   const [pendingElapsedMs, setPendingElapsedMs] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState<'idle' | 'converting' | 'uploading'>('idle');
   const [online, setOnline] = useState(true);
 
   const recorder = useRecorder({ mode, gain });
@@ -121,19 +123,36 @@ export default function RecordPage() {
   };
 
   const handleStop = async () => {
-    const blob = await recorder.stop();
-    if (!blob || !sessionId) {
+    const rawBlob = await recorder.stop();
+    if (!rawBlob || !sessionId) {
       toast.error('録音データが取得できませんでした');
       return;
     }
-    // 通信断に備えて即座に保持
-    setPendingBlob(blob);
-    setPendingElapsedMs(recorder.elapsedMs);
 
     setUploading(true);
+    setUploadPhase('converting');
+    let wavBlob: Blob;
     try {
-      await uploadBlob(sessionId, blob, recorder.elapsedMs);
-      // 成功したので保持Blobをクリアして文字起こしを発火
+      // Gemini が認識できる WAV (16kHz mono) に変換
+      wavBlob = await convertToWav(rawBlob);
+    } catch (e) {
+      console.error('[WAV変換失敗]', e);
+      toast.error('音声の変換に失敗しました');
+      // 失敗時は元Blobで保持（ユーザーがダウンロードできるように）
+      setPendingBlob(rawBlob);
+      setPendingElapsedMs(recorder.elapsedMs);
+      setUploading(false);
+      setUploadPhase('idle');
+      return;
+    }
+
+    // 通信断に備えて即座に WAV を保持
+    setPendingBlob(wavBlob);
+    setPendingElapsedMs(recorder.elapsedMs);
+
+    setUploadPhase('uploading');
+    try {
+      await uploadBlob(sessionId, wavBlob, recorder.elapsedMs);
       setPendingBlob(null);
       fetch(`/api/transcribe/${sessionId}`, { method: 'POST' }).catch(() => {});
       toast.success('アップロード完了。文字起こしを開始します');
@@ -145,12 +164,14 @@ export default function RecordPage() {
           : 'アップロードに失敗しました',
       );
       setUploading(false);
+      setUploadPhase('idle');
     }
   };
 
   const handleRetryUpload = async () => {
     if (!pendingBlob || !sessionId) return;
     setUploading(true);
+    setUploadPhase('uploading');
     try {
       await uploadBlob(sessionId, pendingBlob, pendingElapsedMs);
       setPendingBlob(null);
@@ -160,6 +181,7 @@ export default function RecordPage() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '再アップロードに失敗しました');
       setUploading(false);
+      setUploadPhase('idle');
     }
   };
 
@@ -225,7 +247,10 @@ export default function RecordPage() {
         <Card>
           <CardContent className="flex items-center gap-3 py-4">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">音声をアップロード中...</span>
+            <span className="text-sm">
+              {uploadPhase === 'converting' && '音声を WAV 形式に変換中...'}
+              {uploadPhase === 'uploading' && '音声をアップロード中...'}
+            </span>
           </CardContent>
         </Card>
       )}
