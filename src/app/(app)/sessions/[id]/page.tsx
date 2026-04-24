@@ -11,6 +11,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { FileText } from 'lucide-react';
 import { StatusPoller } from '@/components/session/StatusPoller';
 import { TranscriptList } from '@/components/session/TranscriptList';
+import { RetryTranscribeButton } from '@/components/session/RetryTranscribeButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,6 +57,15 @@ export default async function SessionPage({
   const isBusy = item.status === 'uploading' || item.status === 'processing';
   const status = STATUS_LABEL[item.status] ?? STATUS_LABEL.uploading;
 
+  // 詰まり検出: processing のまま 3 分以上 updatedAt が古い場合は詰まり扱い
+  const stuckThresholdMs = 3 * 60 * 1000;
+  const isStuck =
+    item.status === 'processing' &&
+    Date.now() - new Date(item.updatedAt).getTime() > stuckThresholdMs;
+  const canRetryTranscribe =
+    !!item.audioBlobUrl &&
+    (item.status === 'failed' || isStuck);
+
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 space-y-4">
       <StatusPoller status={item.status} />
@@ -79,15 +89,30 @@ export default async function SessionPage({
           {item.audioBlobUrl && (
             <audio controls src={item.audioBlobUrl} className="w-full" />
           )}
-          {isBusy && (
+          {isBusy && !isStuck && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               {status.label}...（約5秒ごとに自動更新）
             </div>
           )}
+          {isStuck && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
+              <p className="font-medium text-amber-700 dark:text-amber-300">
+                処理が止まっているようです
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                通信断などで文字起こしが開始できなかった可能性があります。再実行してください。
+              </p>
+            </div>
+          )}
           {item.status === 'failed' && (
             <div className="text-sm text-destructive">
-              文字起こしに失敗しました。時間をおいて再度お試しください。
+              文字起こしに失敗しました。再実行するか、時間をおいて再度お試しください。
+            </div>
+          )}
+          {canRetryTranscribe && (
+            <div>
+              <RetryTranscribeButton sessionId={id} />
             </div>
           )}
         </CardContent>
