@@ -137,13 +137,13 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
 
       let preGainNode: AudioNode = src;
       if (preset.compressor) {
-        // 小さい音を持ち上げ、ピークは抑える設定（ブロードキャスト向け設定ベース）
+        // 音声向けの穏やかなコンプレッション設定（歪みを避けつつ声を均一化）
         const compressor = ctx.createDynamicsCompressor();
-        compressor.threshold.setValueAtTime(-50, ctx.currentTime); // -50dB を超えたら圧縮開始
-        compressor.knee.setValueAtTime(40, ctx.currentTime);
-        compressor.ratio.setValueAtTime(12, ctx.currentTime);
-        compressor.attack.setValueAtTime(0.003, ctx.currentTime);
-        compressor.release.setValueAtTime(0.25, ctx.currentTime);
+        compressor.threshold.setValueAtTime(-24, ctx.currentTime);
+        compressor.knee.setValueAtTime(10, ctx.currentTime);
+        compressor.ratio.setValueAtTime(4, ctx.currentTime);
+        compressor.attack.setValueAtTime(0.005, ctx.currentTime);
+        compressor.release.setValueAtTime(0.1, ctx.currentTime);
         src.connect(compressor);
         preGainNode = compressor;
         compressorRef.current = compressor;

@@ -4,31 +4,26 @@ import { generateWithFallback } from '@/lib/gemini';
 import { db } from '@/lib/db';
 import { recordingSessions, transcripts, speakerMappings } from '@/lib/db/schema';
 
-const TRANSCRIBE_PROMPT = `添付の音声を日本語で**忠実に**文字起こししてください。
+const TRANSCRIBE_PROMPT = `添付の音声を日本語で文字起こししてください。
 
-【最重要: ハルシネーション防止】
-- 実際に音声から聞き取れた内容のみを出力すること。聞こえていない言葉を補完・創作してはいけません。
-- 同じ短い語（「はい」「うん」等）が何度も連続する結果になった場合、それはほぼ間違いなく誤認識です。その場合は該当箇所を "[音声不明瞭]" と出力してください。
-- 音声が不明瞭・無音・雑音のみの区間は segment に含めないか、text を "[聞き取り不能]" としてください。
-- 推測や一般論で埋めず、不明な部分は不明なままにすること。
+【規則】
+- 聞き取れた内容を忠実に書き起こす。聞こえていない言葉を補完しない。
+- 話者が複数いる場合は speaker を 0,1,2 の整数で区別（同じ声は同じ番号）。
+- 話者が1人なら全て 0。
+- 相槌（「はい」「うん」）が不自然に連続する結果は誤認識の可能性が高いので、その箇所は推測せず実際に聞こえる単語だけ出力する。
+- フィラー（えー、あのー等）は省略可。
+- 句読点を含む自然な日本語に整える。
 
 【出力形式】
-以下のJSONのみを返してください（前後に説明文・コードフェンスは不要）：
+JSON のみを返す。前後の説明やコードフェンスは不要。
+
 {
   "segments": [
     { "speaker": 0, "startMs": 0, "endMs": 1500, "text": "発言内容" }
   ]
 }
 
-【話者区別】
-- speaker は整数 (0, 1, 2, ...)。同じ声には同じ番号を使うこと。
-- 話者が1人しかいない場合は全て 0。
-
-【その他】
-- startMs, endMs は音声の開始からのミリ秒。
-- text は句読点を含む自然な日本語に整えること。
-- セグメントは発話単位で区切る（長すぎる場合は文単位で）。
-- 音声全体が聞き取れない場合は { "segments": [] } を返すこと。`;
+startMs, endMs は音声開始からのミリ秒。`;
 
 type TranscribeSegment = {
   speaker: number;
@@ -42,16 +37,34 @@ type TranscribeResult = {
 };
 
 function parseResult(text: string): TranscribeResult {
-  // Gemini は稀に markdown code fence で囲むことがある
-  const cleaned = text
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/```\s*$/i, '')
-    .trim();
-  const parsed = JSON.parse(cleaned);
-  if (!parsed || !Array.isArray(parsed.segments)) {
-    throw new Error('Invalid Gemini response: missing segments array');
+  // Gemini は稀に markdown code fence や前後の説明文を付けることがあるので
+  // 中身の JSON オブジェクトだけを抽出してパースする。
+  const trimmed = text.trim();
+  const candidates: string[] = [trimmed];
+
+  const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenceMatch) candidates.push(fenceMatch[1].trim());
+
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    candidates.push(trimmed.slice(firstBrace, lastBrace + 1));
   }
-  return parsed as TranscribeResult;
+
+  for (const c of candidates) {
+    try {
+      const parsed = JSON.parse(c);
+      if (parsed && Array.isArray(parsed.segments)) {
+        return parsed as TranscribeResult;
+      }
+    } catch {
+      // 次の候補を試す
+    }
+  }
+
+  console.warn('[transcribe] could not parse JSON from Gemini response, treating as empty:',
+    text.slice(0, 500));
+  return { segments: [] };
 }
 
 async function fetchAudioAsBase64(url: string): Promise<{ base64: string; mimeType: string }> {
@@ -148,6 +161,13 @@ export async function transcribeAudio(sessionId: string): Promise<void> {
       })
       .where(eq(recordingSessions.id, sessionId));
   } catch (err) {
+    console.error('[transcribe] Gemini call failed', {
+      sessionId,
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+    // Gemini の一時エラー（ネットワーク / 429 / 一時的な内部エラー）は「詰まり」として扱い、
+    // status を processing のまま残さず failed にしてユーザーが再実行できるようにする。
     await db
       .update(recordingSessions)
       .set({ status: 'failed', updatedAt: new Date() })
