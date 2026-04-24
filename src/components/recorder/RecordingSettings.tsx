@@ -15,7 +15,10 @@ const MODE_ICONS: Record<RecordingMode, typeof Mic> = {
 type Props = {
   mode: RecordingMode;
   gain: number;
-  disabled?: boolean;
+  /** モード変更ボタン（録音中はマイクの再取得が必要なため無効） */
+  modeDisabled?: boolean;
+  /** ゲインスライダー（録音中もリアルタイム変更可能） */
+  gainDisabled?: boolean;
   onModeChange: (mode: RecordingMode) => void;
   onGainChange: (gain: number) => void;
 };
@@ -23,7 +26,8 @@ type Props = {
 export function RecordingSettings({
   mode,
   gain,
-  disabled,
+  modeDisabled,
+  gainDisabled,
   onModeChange,
   onGainChange,
 }: Props) {
@@ -46,7 +50,7 @@ export function RecordingSettings({
                 <button
                   key={m}
                   type="button"
-                  disabled={disabled}
+                  disabled={modeDisabled}
                   onClick={() => onModeChange(m)}
                   className={`flex flex-col items-center gap-1.5 rounded-lg border p-3 text-sm transition-colors ${
                     selected
@@ -79,10 +83,10 @@ export function RecordingSettings({
             min={0.5}
             max={5}
             step={0.1}
-            disabled={disabled}
+            disabled={gainDisabled}
           />
           <p className="mt-2 text-xs text-muted-foreground">
-            遠い声を大きくする時は数値を上げてください（1.0〜2.0 が標準）
+            遠い声を大きくする時は数値を上げてください（1.0〜2.0 が標準）。録音中もリアルタイムに調整できます。
           </p>
         </div>
       </CardContent>

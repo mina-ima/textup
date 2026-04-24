@@ -29,17 +29,26 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
   const streamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const destRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const timerRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const startedAtRef = useRef<number>(0);
   const pausedElapsedRef = useRef<number>(0);
-  const gainRef = useRef<number>(gain);
 
+  // gain 値の変更を録音中の GainNode にリアルタイム反映
   useEffect(() => {
-    gainRef.current = gain;
+    if (gainRef.current && audioCtxRef.current) {
+      // setTargetAtTime でプチノイズを抑えつつスムーズに変化
+      gainRef.current.gain.setTargetAtTime(
+        gain,
+        audioCtxRef.current.currentTime,
+        0.01,
+      );
+    }
   }, [gain]);
 
   const cleanupStream = useCallback(() => {
@@ -53,9 +62,15 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     sourceRef.current?.disconnect();
+    gainRef.current?.disconnect();
     analyserRef.current?.disconnect();
+    destRef.current?.disconnect();
     audioCtxRef.current?.close().catch(() => {});
     audioCtxRef.current = null;
+    sourceRef.current = null;
+    gainRef.current = null;
+    analyserRef.current = null;
+    destRef.current = null;
     recorderRef.current = null;
   }, []);
 
@@ -74,8 +89,8 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
       sum += v * v;
     }
     const rms = Math.sqrt(sum / buf.length);
-    // ゲイン設定はアプリ側で擬似的に増幅表示（録音データ自体はブラウザAGC依存）
-    setLevel(Math.min(1, rms * 1.5 * gainRef.current));
+    // GainNode を通過後の音量を測っているのでゲインの効果がそのまま反映される
+    setLevel(Math.min(1, rms * 1.5));
     rafRef.current = requestAnimationFrame(updateLevel);
   }, []);
 
@@ -84,8 +99,7 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
     setState('requesting');
     try {
       const preset = RECORDING_PRESETS[mode];
-      // モバイル互換性のため sampleRate/channelCount は強制しない（デバイス任せ）
-      // noiseSuppression/echoCancellation/autoGainControl のみをブラウザに依頼
+      // モバイル互換性のため sampleRate/channelCount は指定しない（デバイス任せ）
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           noiseSuppression: preset.noiseSuppression,
@@ -96,31 +110,39 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
       streamRef.current = stream;
 
       const tracks = stream.getAudioTracks();
-      if (tracks.length === 0 || !tracks[0].enabled) {
+      if (tracks.length === 0) {
         throw new Error('マイクの音声トラックが取得できませんでした');
       }
 
-      // Web Audio API は音量メーター監視用にのみ使う（録音パイプラインには挟まない）
       const AudioCtx: typeof AudioContext =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtx();
-      // モバイル Safari/Chrome で suspended の場合があるので resume
       if (ctx.state === 'suspended') {
         await ctx.resume();
       }
       audioCtxRef.current = ctx;
 
       const src = ctx.createMediaStreamSource(stream);
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = gain;
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 1024;
-      src.connect(analyser);
-      // destination に接続しない（スピーカーからのハウリングを防ぐ）
+      const dest = ctx.createMediaStreamDestination();
+
+      // source → gain → [analyser (メーター), dest (録音へ)]
+      src.connect(gainNode);
+      gainNode.connect(analyser);
+      gainNode.connect(dest);
 
       sourceRef.current = src;
+      gainRef.current = gainNode;
       analyserRef.current = analyser;
+      destRef.current = dest;
 
-      // MediaRecorder には元のストリームを直接渡す（最も確実）
+      // 録音は dest.stream（GainNode を通した音声）を使う
+      const recStream = dest.stream;
+
       const mimeType =
         MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
           ? 'audio/webm;codecs=opus'
@@ -133,8 +155,8 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
                 : '';
 
       const rec = mimeType
-        ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 64000 })
-        : new MediaRecorder(stream);
+        ? new MediaRecorder(recStream, { mimeType, audioBitsPerSecond: 64000 })
+        : new MediaRecorder(recStream);
 
       chunksRef.current = [];
       rec.ondataavailable = (e) => {
@@ -170,6 +192,8 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
       setState('error');
       cleanupStream();
     }
+    // 初期 gain は start 時点のスナップショットで良い。以降は useEffect で追随。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, updateLevel, cleanupStream]);
 
   const pause = useCallback(() => {

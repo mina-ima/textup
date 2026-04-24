@@ -269,7 +269,8 @@ export default function RecordPage() {
       <RecordingSettings
         mode={mode}
         gain={gain}
-        disabled={isRecording || recorder.state === 'requesting' || uploading}
+        modeDisabled={isRecording || recorder.state === 'requesting' || uploading}
+        gainDisabled={recorder.state === 'requesting' || uploading}
         onModeChange={setMode}
         onGainChange={setGain}
       />
