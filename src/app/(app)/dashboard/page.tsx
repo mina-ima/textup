@@ -7,6 +7,7 @@ import { recordingSessions } from '@/lib/db/schema';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { DeleteSessionButton } from '@/components/session/DeleteSessionButton';
 
 const STATUS_LABEL: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   uploading: { label: 'アップロード中', variant: 'secondary' },
@@ -75,18 +76,32 @@ export default async function DashboardPage() {
           {items.map((item) => {
             const status = STATUS_LABEL[item.status] ?? STATUS_LABEL.uploading;
             return (
-              <Link key={item.id} href={`/sessions/${item.id}`}>
-                <Card className="transition-colors hover:border-indigo-300">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-base">{item.title}</CardTitle>
+              <Card
+                key={item.id}
+                className="transition-colors hover:border-indigo-300"
+              >
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <Link
+                    href={`/sessions/${item.id}`}
+                    className="min-w-0 flex-1 truncate"
+                  >
+                    <CardTitle className="text-base truncate">{item.title}</CardTitle>
+                  </Link>
+                  <div className="flex items-center gap-2">
                     <Badge variant={status.variant}>{status.label}</Badge>
-                  </CardHeader>
+                    <DeleteSessionButton
+                      sessionId={item.id}
+                      title={item.title}
+                    />
+                  </div>
+                </CardHeader>
+                <Link href={`/sessions/${item.id}`}>
                   <CardContent className="flex items-center justify-between text-sm text-muted-foreground">
                     <span>{formatDate(item.startedAt)}</span>
                     <span>{formatDuration(item.durationSec)}</span>
                   </CardContent>
-                </Card>
-              </Link>
+                </Link>
+              </Card>
             );
           })}
         </div>

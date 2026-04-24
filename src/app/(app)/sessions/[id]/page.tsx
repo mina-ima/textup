@@ -12,6 +12,7 @@ import { FileText } from 'lucide-react';
 import { StatusPoller } from '@/components/session/StatusPoller';
 import { TranscriptList } from '@/components/session/TranscriptList';
 import { RetryTranscribeButton } from '@/components/session/RetryTranscribeButton';
+import { DeleteSessionButton } from '@/components/session/DeleteSessionButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,9 +82,16 @@ export default async function SessionPage({
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle>{item.title}</CardTitle>
-          <Badge variant={status.variant}>{status.label}</Badge>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 gap-2">
+          <CardTitle className="min-w-0 truncate">{item.title}</CardTitle>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Badge variant={status.variant}>{status.label}</Badge>
+            <DeleteSessionButton
+              sessionId={id}
+              title={item.title}
+              redirectTo="/dashboard"
+            />
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {item.audioBlobUrl && (

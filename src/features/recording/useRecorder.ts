@@ -29,15 +29,18 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
   const streamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const gainRef = useRef<GainNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const destRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const timerRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const startedAtRef = useRef<number>(0);
   const pausedElapsedRef = useRef<number>(0);
+  const gainRef = useRef<number>(gain);
+
+  useEffect(() => {
+    gainRef.current = gain;
+  }, [gain]);
 
   const cleanupStream = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -50,23 +53,15 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     sourceRef.current?.disconnect();
-    gainRef.current?.disconnect();
     analyserRef.current?.disconnect();
-    destRef.current?.disconnect();
     audioCtxRef.current?.close().catch(() => {});
     audioCtxRef.current = null;
+    recorderRef.current = null;
   }, []);
 
   useEffect(() => {
     return () => cleanupStream();
   }, [cleanupStream]);
-
-  // Apply gain live while recording
-  useEffect(() => {
-    if (gainRef.current) {
-      gainRef.current.gain.value = gain;
-    }
-  }, [gain]);
 
   const updateLevel = useCallback(() => {
     const analyser = analyserRef.current;
@@ -79,7 +74,8 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
       sum += v * v;
     }
     const rms = Math.sqrt(sum / buf.length);
-    setLevel(Math.min(1, rms * 1.5));
+    // ゲイン設定はアプリ側で擬似的に増幅表示（録音データ自体はブラウザAGC依存）
+    setLevel(Math.min(1, rms * 1.5 * gainRef.current));
     rafRef.current = requestAnimationFrame(updateLevel);
   }, []);
 
@@ -88,54 +84,65 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
     setState('requesting');
     try {
       const preset = RECORDING_PRESETS[mode];
+      // モバイル互換性のため sampleRate/channelCount は強制しない（デバイス任せ）
+      // noiseSuppression/echoCancellation/autoGainControl のみをブラウザに依頼
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           noiseSuppression: preset.noiseSuppression,
           echoCancellation: preset.echoCancellation,
           autoGainControl: preset.autoGainControl,
-          channelCount: 1,
-          sampleRate: 16000,
         },
       });
       streamRef.current = stream;
 
+      const tracks = stream.getAudioTracks();
+      if (tracks.length === 0 || !tracks[0].enabled) {
+        throw new Error('マイクの音声トラックが取得できませんでした');
+      }
+
+      // Web Audio API は音量メーター監視用にのみ使う（録音パイプラインには挟まない）
       const AudioCtx: typeof AudioContext =
-        window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtx();
+      // モバイル Safari/Chrome で suspended の場合があるので resume
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
       audioCtxRef.current = ctx;
 
       const src = ctx.createMediaStreamSource(stream);
-      const gainNode = ctx.createGain();
-      gainNode.gain.value = gain;
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 1024;
-      const dest = ctx.createMediaStreamDestination();
-
-      src.connect(gainNode);
-      gainNode.connect(analyser);
-      gainNode.connect(dest);
+      src.connect(analyser);
+      // destination に接続しない（スピーカーからのハウリングを防ぐ）
 
       sourceRef.current = src;
-      gainRef.current = gainNode;
       analyserRef.current = analyser;
-      destRef.current = dest;
 
+      // MediaRecorder には元のストリームを直接渡す（最も確実）
       const mimeType =
         MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
           ? 'audio/webm;codecs=opus'
           : MediaRecorder.isTypeSupported('audio/webm')
             ? 'audio/webm'
-            : MediaRecorder.isTypeSupported('audio/mp4')
-              ? 'audio/mp4'
-              : '';
+            : MediaRecorder.isTypeSupported('audio/mp4;codecs=mp4a.40.2')
+              ? 'audio/mp4;codecs=mp4a.40.2'
+              : MediaRecorder.isTypeSupported('audio/mp4')
+                ? 'audio/mp4'
+                : '';
 
       const rec = mimeType
-        ? new MediaRecorder(dest.stream, { mimeType, audioBitsPerSecond: 64000 })
-        : new MediaRecorder(dest.stream);
+        ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 64000 })
+        : new MediaRecorder(stream);
 
       chunksRef.current = [];
       rec.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      rec.onerror = (e) => {
+        console.error('[MediaRecorder] error', e);
+        setError('録音中にエラーが発生しました');
       };
       recorderRef.current = rec;
 
@@ -153,11 +160,17 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
       updateLevel();
       setState('recording');
     } catch (e) {
-      setError(e instanceof Error ? e.message : '録音の開始に失敗しました');
+      console.error('[useRecorder] start failed', e);
+      const msg = e instanceof Error ? e.message : '録音の開始に失敗しました';
+      setError(
+        msg.includes('Permission') || msg.includes('NotAllowed')
+          ? 'マイクの使用が許可されていません。ブラウザの設定で許可してください。'
+          : msg,
+      );
       setState('error');
       cleanupStream();
     }
-  }, [mode, gain, updateLevel, cleanupStream]);
+  }, [mode, updateLevel, cleanupStream]);
 
   const pause = useCallback(() => {
     if (recorderRef.current?.state === 'recording') {
@@ -185,9 +198,6 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
         const blob = new Blob(chunksRef.current, {
           type: rec.mimeType || 'audio/webm',
         });
-        if (rec.state !== 'recording' && rec.state !== 'paused') {
-          // already stopped
-        }
         const finalMs = rec.state === 'paused'
           ? pausedElapsedRef.current
           : pausedElapsedRef.current + (Date.now() - startedAtRef.current);
