@@ -46,6 +46,21 @@ export async function convertToWav(blob: Blob): Promise<Blob> {
     resampled[i] = mono[lo] * (1 - frac) + mono[hi] * frac;
   }
 
+  // ピーク正規化: 最大振幅が 0.95 になるようゲインをかける。
+  // Gemini が音声を認識しやすくするため、小さい録音を底上げする。
+  let peak = 0;
+  for (let i = 0; i < resampled.length; i++) {
+    const abs = Math.abs(resampled[i]);
+    if (abs > peak) peak = abs;
+  }
+  const TARGET_PEAK = 0.95;
+  if (peak > 0 && peak < TARGET_PEAK) {
+    const gain = TARGET_PEAK / peak;
+    for (let i = 0; i < resampled.length; i++) {
+      resampled[i] *= gain;
+    }
+  }
+
   return encodeWav(resampled, TARGET_SAMPLE_RATE);
 }
 
