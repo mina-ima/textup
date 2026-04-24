@@ -7,7 +7,7 @@ import { recordingSessions } from '@/lib/db/schema';
 const CreateBody = z.object({
   title: z.string().min(1).max(120).optional(),
   recordingMode: z.enum(['close', 'meeting', 'lecture', 'web']).optional(),
-  gainValue: z.number().int().min(1).max(10).optional(),
+  gainValue: z.number().int().min(1).max(20).optional(),
 });
 
 export async function POST(request: Request) {

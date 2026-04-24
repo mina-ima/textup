@@ -12,7 +12,7 @@ import { RecorderControls } from '@/components/recorder/RecorderControls';
 import { AudioLevelMeter } from '@/components/recorder/AudioLevelMeter';
 import { useRecorder } from '@/features/recording/useRecorder';
 import { convertToWav } from '@/features/recording/encodeWav';
-import type { RecordingMode } from '@/features/recording/types';
+import { RECORDING_PRESETS, type RecordingMode } from '@/features/recording/types';
 
 function formatTime(ms: number): string {
   const total = Math.floor(ms / 1000);
@@ -52,7 +52,13 @@ async function uploadBlob(
 export default function RecordPage() {
   const router = useRouter();
   const [mode, setMode] = useState<RecordingMode>('meeting');
-  const [gain, setGain] = useState(2);
+  const [gain, setGain] = useState(RECORDING_PRESETS.meeting.gain);
+
+  // モード変更時（録音中以外）にプリセットの初期ゲインへ自動追従
+  const handleModeChange = (nextMode: RecordingMode) => {
+    setMode(nextMode);
+    setGain(RECORDING_PRESETS[nextMode].gain);
+  };
   const [uploading, setUploading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
@@ -296,7 +302,7 @@ export default function RecordPage() {
         gain={gain}
         modeDisabled={isRecording || recorder.state === 'requesting' || uploading}
         gainDisabled={recorder.state === 'requesting' || uploading}
-        onModeChange={setMode}
+        onModeChange={handleModeChange}
         onGainChange={setGain}
       />
 

@@ -29,6 +29,7 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
   const streamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const compressorRef = useRef<DynamicsCompressorNode | null>(null);
   const gainRef = useRef<GainNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const destRef = useRef<MediaStreamAudioDestinationNode | null>(null);
@@ -62,12 +63,14 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     sourceRef.current?.disconnect();
+    compressorRef.current?.disconnect();
     gainRef.current?.disconnect();
     analyserRef.current?.disconnect();
     destRef.current?.disconnect();
     audioCtxRef.current?.close().catch(() => {});
     audioCtxRef.current = null;
     sourceRef.current = null;
+    compressorRef.current = null;
     gainRef.current = null;
     analyserRef.current = null;
     destRef.current = null;
@@ -124,14 +127,29 @@ export function useRecorder({ mode, gain }: UseRecorderOptions): RecorderApi {
       audioCtxRef.current = ctx;
 
       const src = ctx.createMediaStreamSource(stream);
-      const gainNode = ctx.createGain();
-      gainNode.gain.value = gain;
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 1024;
       const dest = ctx.createMediaStreamDestination();
 
-      // source → gain → [analyser (メーター), dest (録音へ)]
-      src.connect(gainNode);
+      // パイプライン: source → [compressor?] → gain → [analyser (メーター), dest (録音へ)]
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = gain;
+
+      let preGainNode: AudioNode = src;
+      if (preset.compressor) {
+        // 小さい音を持ち上げ、ピークは抑える設定（ブロードキャスト向け設定ベース）
+        const compressor = ctx.createDynamicsCompressor();
+        compressor.threshold.setValueAtTime(-50, ctx.currentTime); // -50dB を超えたら圧縮開始
+        compressor.knee.setValueAtTime(40, ctx.currentTime);
+        compressor.ratio.setValueAtTime(12, ctx.currentTime);
+        compressor.attack.setValueAtTime(0.003, ctx.currentTime);
+        compressor.release.setValueAtTime(0.25, ctx.currentTime);
+        src.connect(compressor);
+        preGainNode = compressor;
+        compressorRef.current = compressor;
+      }
+
+      preGainNode.connect(gainNode);
       gainNode.connect(analyser);
       gainNode.connect(dest);
 

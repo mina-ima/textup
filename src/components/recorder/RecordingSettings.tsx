@@ -81,12 +81,12 @@ export function RecordingSettings({
             value={[gain]}
             onValueChange={(v) => onGainChange(Array.isArray(v) ? v[0] : v)}
             min={0.5}
-            max={5}
-            step={0.1}
+            max={20}
+            step={0.5}
             disabled={gainDisabled}
           />
           <p className="mt-2 text-xs text-muted-foreground">
-            遠い声を大きくする時は数値を上げてください（1.0〜2.0 が標準）。録音中もリアルタイムに調整できます。
+            近距離は 1〜2、中距離の会議は 3〜5、遠距離の講義は 5〜15 を目安に。録音中もリアルタイムに調整できます。
           </p>
         </div>
       </CardContent>
