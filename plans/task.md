@@ -92,14 +92,20 @@
   - 再実行ボタン→API発火→全モデルフォールバック は動作確認済み
   - 503フォールバックも実動作確認
 
+## Phase 8: Gemini 候補順の最適化（2026-04-27）
+- [x] DEFAULT_CANDIDATES を「実在モデル優先」に並び替え
+  - 残: `gemini-3.0-flash`（未来枠1段）, `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-2.0-flash`
+  - 除外: `gemini-3.5-flash`, `gemini-2.0-flash-exp`, `gemini-1.5-flash`, `gemini-1.5-flash-latest`
+  - 対象: `src/lib/gemini.ts` の `DEFAULT_CANDIDATES`
+- [x] `package.json` バージョンを v0.2.10 にバンプ
+- [ ] dev / 本番でモデル選定挙動を確認
+- [ ] 本番 Vercel にデプロイ
+
 ## 今後の課題（次回以降）
 
 ### 文字起こし系
-- [ ] Gemini 無料枠（limit: 0 / 429）が頻発。解消策を検討:
-  - 候補モデル順を「現実に動くモデル優先」に並び替え（gemini-2.5-flash → gemini-2.5-pro → gemini-2.0-flash）
-  - 404 を常に返すモデル（gemini-3.5-flash, 3.0-flash, 2.0-flash-exp, 1.5-flash, 1.5-flash-latest）を候補から除外
-  - ListModels で利用可能モデルを動的に取得する案も
-  - 有料プランへの切替は別途検討
+- [ ] ListModels API で利用可能モデルを動的取得（候補リスト自動更新）
+  - キャッシュ付き、`generateContent` 対応モデルのみ、バージョン降順
 - [ ] Gemini 429 の `retryDelay` を尊重して指数バックオフ付きリトライを実装
 - [ ] 再実行中の重複 POST 防止（現状は `busy` state のみ、サーバー側で `processing` 中の rate limit は未実装）
 - [ ] retry count / 履歴の可視化

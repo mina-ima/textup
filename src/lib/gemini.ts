@@ -1,18 +1,15 @@
 import 'server-only';
 import { GoogleGenerativeAI, type GenerativeModel, type Part } from '@google/generative-ai';
 
-// 新しいモデル優先順。未来モデル（まだ未リリース）を先頭に並べることで、
-// リリースされた瞬間にコード変更なしで採用される。
-// 404 / quota / billing エラー時に次候補へフォールバック。
+// 候補順は「実在が確認できるモデルを上位、未来モデル枠を最後に少数」。
+// 常時 404 を返すと判明したモデル（3.5-flash, 3.0-flash, 2.0-flash-exp,
+// 1.5-flash, 1.5-flash-latest）は除外し、無駄なフォールバックを減らす。
+// 未来モデルは 1 段だけ先頭に残し、リリース時にコード変更なしで自動採用。
 const DEFAULT_CANDIDATES = [
-  'gemini-3.5-flash',
   'gemini-3.0-flash',
   'gemini-2.5-flash',
   'gemini-2.5-pro',
   'gemini-2.0-flash',
-  'gemini-2.0-flash-exp',
-  'gemini-1.5-flash',
-  'gemini-1.5-flash-latest',
 ] as const;
 
 function getCandidates(): string[] {
