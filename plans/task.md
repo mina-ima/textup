@@ -120,12 +120,19 @@
   - 初回 429 + retryDelay 取得可能 → sleep 後に同モデル再試行 1 回
   - 再試行も失敗 or retryDelay 無し → 既存どおり次候補へフォールバック
 - [x] 8 ケース手動テスト全パス（実 Gemini エラー文字列含む）
+- [x] v0.2.13 デプロイ確認
+
+## Phase 12: 重複 POST 防止と stuck 自動解除（2026-04-27 / v0.2.14）
+- [x] `error-messages.ts` に `already_processing` カテゴリ追加
+- [x] `getCategorySummary()` ヘルパ追加
+- [x] `/api/transcribe/[id]` に processing ガード（5 分以内更新 → 409）
+- [x] 5 分超過の `processing` は stuck とみなして再実行を許可
+- [x] サマリ側は `status='ready'` 必須 + upsert 冪等のため追加ロックは見送り
 - [ ] 本番 Vercel にデプロイ
 
 ## 今後の課題（次回以降）
 
 ### 文字起こし系
-- [ ] 再実行中の重複 POST 防止（サーバー側で `processing` 中の rate limit）
 - [ ] retry count / 履歴の可視化
 
 ### UI/UX

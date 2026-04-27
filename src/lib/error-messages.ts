@@ -14,6 +14,7 @@ export type ErrorCategory =
   | 'timeout'
   | 'network'
   | 'all_models_failed'
+  | 'already_processing'
   | 'unknown';
 
 const SUMMARY_BY_CATEGORY: Record<ErrorCategory, string> = {
@@ -30,6 +31,8 @@ const SUMMARY_BY_CATEGORY: Record<ErrorCategory, string> = {
   network: 'ネットワーク接続に問題があります。接続状況をご確認ください',
   all_models_failed:
     '利用可能なすべての Gemini モデルが失敗しました。時間をおいて再度お試しください',
+  already_processing:
+    'すでに処理中です。完了まで少しお待ちください',
   unknown:
     '一時的な問題が発生しました。少し待ってから再度お試しください',
 };
@@ -111,4 +114,8 @@ export function summarizeError(err: unknown): {
   const detail = err instanceof Error ? err.message : String(err);
   const category = categorize(detail);
   return { summary: SUMMARY_BY_CATEGORY[category], category, detail };
+}
+
+export function getCategorySummary(category: ErrorCategory): string {
+  return SUMMARY_BY_CATEGORY[category];
 }

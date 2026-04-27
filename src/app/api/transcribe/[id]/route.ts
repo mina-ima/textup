@@ -4,7 +4,10 @@ import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { recordingSessions } from '@/lib/db/schema';
 import { transcribeAudio } from '@/features/transcription/transcribeAudio';
-import { summarizeError } from '@/lib/error-messages';
+import { summarizeError, getCategorySummary } from '@/lib/error-messages';
+
+// 5 分以上更新が無い processing は「stuck」とみなして再実行を許可する
+const PROCESSING_LOCK_MS = 5 * 60 * 1000;
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -35,6 +38,27 @@ export async function POST(
   }
   if (!target.audioBlobUrl) {
     return NextResponse.json({ error: 'No audio uploaded yet' }, { status: 400 });
+  }
+
+  if (target.status === 'processing') {
+    const updatedAt =
+      target.updatedAt instanceof Date
+        ? target.updatedAt
+        : new Date(target.updatedAt);
+    const elapsed = Date.now() - updatedAt.getTime();
+    if (elapsed < PROCESSING_LOCK_MS) {
+      return NextResponse.json(
+        {
+          error: 'Already processing',
+          summary: getCategorySummary('already_processing'),
+          category: 'already_processing',
+        },
+        { status: 409 },
+      );
+    }
+    console.warn(
+      `[transcribe] stuck processing detected for ${id} (${Math.round(elapsed / 1000)}s), allowing retry`,
+    );
   }
 
   try {
