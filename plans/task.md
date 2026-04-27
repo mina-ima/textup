@@ -144,6 +144,18 @@
 - [x] 詳細ページの失敗ブロックにカテゴリ別文言と再試行情報を表示
 - [x] dashboard カードに「再試行 N 回」バッジ（失敗時のみ）
 - [x] drizzle.config.ts に dotenv 明示読み込み追加（`.env.local` 対応）
+- [x] v0.2.16 デプロイ確認
+
+## Phase 15: preview/exp 系を候補から除外し精度を底上げ（2026-04-27 / v0.2.17）
+- [x] `fetchAvailableModels()` のフィルタに `preview / exp / latest` 除外を追加
+- [x] 候補は 11 → 5 モデルに絞り込み
+  - 1. gemini-2.5-pro（高精度、最初に挑戦）
+  - 2. gemini-2.5-flash（リカバリ主力）
+  - 3. gemini-2.5-flash-lite
+  - 4. gemini-2.0-flash
+  - 5. gemini-2.0-flash-lite
+- [x] preview の無駄打ちを排除し、クォータを実質的なモデルにのみ消費
+- [x] 「未来モデル自動採用」は維持（stable リリース時のみ採用、preview は無視）
 - [ ] 本番 Vercel にデプロイ
 
 ## 今後の課題（次回以降）

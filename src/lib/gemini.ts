@@ -77,7 +77,11 @@ async function fetchAvailableModels(): Promise<string[] | null> {
       // -image / -tts / -computer-use / -customtools / 日付・リビジョンサフィックス
       .filter((n) => !/-(image|tts|computer-use|customtools)/.test(n))
       .filter((n) => !/-\d{3,4}$/.test(n))
-      .filter((n) => !/-\d{2}-\d{4}$/.test(n));
+      .filter((n) => !/-\d{2}-\d{4}$/.test(n))
+      // preview / exp / latest を除外:
+      // 文字起こしは確定用途で、preview 系は無料枠が厳しく無駄打ちで
+      // クォータを消費するだけ。stable がリリースされれば自動採用される。
+      .filter((n) => !/-(preview|exp|latest)\b/.test(n));
     list.sort(compareModelVersions);
     return list;
   } catch (err) {
