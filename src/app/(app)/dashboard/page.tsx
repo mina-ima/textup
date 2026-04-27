@@ -8,6 +8,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DeleteSessionButton } from '@/components/session/DeleteSessionButton';
+import { RetryTranscribeButton } from '@/components/session/RetryTranscribeButton';
 
 const STATUS_LABEL: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   uploading: { label: 'アップロード中', variant: 'secondary' },
@@ -87,8 +88,14 @@ export default async function DashboardPage() {
                   >
                     <CardTitle className="text-base truncate">{item.title}</CardTitle>
                   </Link>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <Badge variant={status.variant}>{status.label}</Badge>
+                    {item.status === 'failed' && item.audioBlobUrl && (
+                      <RetryTranscribeButton
+                        sessionId={item.id}
+                        label="再実行"
+                      />
+                    )}
                     <DeleteSessionButton
                       sessionId={item.id}
                       title={item.title}

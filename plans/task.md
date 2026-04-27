@@ -128,15 +128,19 @@
 - [x] `/api/transcribe/[id]` に processing ガード（5 分以内更新 → 409）
 - [x] 5 分超過の `processing` は stuck とみなして再実行を許可
 - [x] サマリ側は `status='ready'` 必須 + upsert 冪等のため追加ロックは見送り
+- [x] v0.2.14 デプロイ確認
+
+## Phase 13: dashboard から失敗セッションの直接再実行（2026-04-27 / v0.2.15）
+- [x] `/dashboard` のカードヘッダに失敗時のみ「再実行」ボタンを追加
+- [x] `audioBlobUrl` 無し（録音前段階の失敗）には表示しない
+- [x] 既存 `RetryTranscribeButton` を再利用（`label="再実行"`）
+- [x] モバイル幅対策で `flex-wrap` を追加
 - [ ] 本番 Vercel にデプロイ
 
 ## 今後の課題（次回以降）
 
 ### 文字起こし系
 - [ ] retry count / 履歴の可視化
-
-### UI/UX
-- [ ] 一覧（dashboard）から「失敗」セッションの直接再実行
 
 ### PWA
 - [ ] Android Chrome 実機動作確認（Phase 6 から持ち越し）
