@@ -92,20 +92,24 @@
   - 再実行ボタン→API発火→全モデルフォールバック は動作確認済み
   - 503フォールバックも実動作確認
 
-## Phase 8: Gemini 候補順の最適化（2026-04-27）
-- [x] DEFAULT_CANDIDATES を「実在モデル優先」に並び替え
-  - 残: `gemini-3.0-flash`（未来枠1段）, `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-2.0-flash`
-  - 除外: `gemini-3.5-flash`, `gemini-2.0-flash-exp`, `gemini-1.5-flash`, `gemini-1.5-flash-latest`
-  - 対象: `src/lib/gemini.ts` の `DEFAULT_CANDIDATES`
-- [x] `package.json` バージョンを v0.2.10 にバンプ
-- [ ] dev / 本番でモデル選定挙動を確認
+## Phase 8: Gemini 候補順の最適化（2026-04-27 / v0.2.10）
+- [x] DEFAULT_CANDIDATES を「実在モデル優先」に並び替え（静的フォールバック用）
+- [x] 常時 404 のモデルを除外
+- [x] v0.2.10 デプロイ確認
+
+## Phase 9: ListModels API による動的候補取得（2026-04-27 / v0.2.11）
+- [x] REST 直叩きで `v1beta/models` から動的取得（SDK に listModels 無し）
+- [x] `generateContent` 対応モデルのみ抽出、`-image` / `-tts` / `-computer-use` / `-customtools` / 日付・リビジョンサフィックスを除外
+- [x] バージョン降順ソート（major → minor → tier）+ preview/exp は降格
+- [x] プロセスメモリキャッシュ TTL 1h
+- [x] 失敗時は静的 `DEFAULT_CANDIDATES` にフォールバック
+- [x] ローカル ListModels テストで 19→11 モデルへ絞り込み確認
 - [ ] 本番 Vercel にデプロイ
+- [ ] 本番ログでフォールバック挙動確認
 
 ## 今後の課題（次回以降）
 
 ### 文字起こし系
-- [ ] ListModels API で利用可能モデルを動的取得（候補リスト自動更新）
-  - キャッシュ付き、`generateContent` 対応モデルのみ、バージョン降順
 - [ ] Gemini 429 の `retryDelay` を尊重して指数バックオフ付きリトライを実装
 - [ ] 再実行中の重複 POST 防止（現状は `busy` state のみ、サーバー側で `processing` 中の rate limit は未実装）
 - [ ] retry count / 履歴の可視化

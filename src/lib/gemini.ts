@@ -1,10 +1,8 @@
 import 'server-only';
 import { GoogleGenerativeAI, type GenerativeModel, type Part } from '@google/generative-ai';
 
-// 候補順は「実在が確認できるモデルを上位、未来モデル枠を最後に少数」。
-// 常時 404 を返すと判明したモデル（3.5-flash, 3.0-flash, 2.0-flash-exp,
-// 1.5-flash, 1.5-flash-latest）は除外し、無駄なフォールバックを減らす。
-// 未来モデルは 1 段だけ先頭に残し、リリース時にコード変更なしで自動採用。
+// 静的フォールバック候補（ListModels API が失敗したときだけ使う）。
+// 動的取得が成功すればこのリストは無視される。
 const DEFAULT_CANDIDATES = [
   'gemini-3.0-flash',
   'gemini-2.5-flash',
@@ -12,7 +10,83 @@ const DEFAULT_CANDIDATES = [
   'gemini-2.0-flash',
 ] as const;
 
-function getCandidates(): string[] {
+// ListModels API キャッシュ（プロセスメモリ、TTL 1h）
+type CachedModels = { fetchedAt: number; models: string[] };
+let modelsCache: CachedModels | null = null;
+const MODELS_TTL_MS = 60 * 60 * 1000;
+
+type ListModelsEntry = {
+  name: string;
+  supportedGenerationMethods?: string[];
+};
+
+// gemini-X.Y[-variant] を [メジャー, マイナー, 階層スコア] に分解。
+// 階層スコア: pro=3, flash=2, flash-lite=1。exp/preview/latest は -5 で降格。
+function parseModelVersion(name: string): {
+  major: number;
+  minor: number;
+  tier: number;
+} {
+  const m = name.match(/^gemini-(\d+)(?:\.(\d+))?(?:-(.+))?$/);
+  if (!m) return { major: 0, minor: 0, tier: 0 };
+  const major = parseInt(m[1], 10);
+  const minor = m[2] ? parseInt(m[2], 10) : 0;
+  const variant = m[3] ?? '';
+  let tier = 0;
+  if (variant.startsWith('pro')) tier = 3;
+  else if (variant.startsWith('flash-lite')) tier = 1;
+  else if (variant.startsWith('flash')) tier = 2;
+  if (
+    variant.includes('exp') ||
+    variant.includes('preview') ||
+    variant.includes('latest')
+  ) {
+    tier -= 5;
+  }
+  return { major, minor, tier };
+}
+
+function compareModelVersions(a: string, b: string): number {
+  const va = parseModelVersion(a);
+  const vb = parseModelVersion(b);
+  if (va.major !== vb.major) return vb.major - va.major;
+  if (va.minor !== vb.minor) return vb.minor - va.minor;
+  return vb.tier - va.tier;
+}
+
+async function fetchAvailableModels(): Promise<string[] | null> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return null;
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}&pageSize=100`,
+      { cache: 'no-store' },
+    );
+    if (!res.ok) {
+      console.warn(`[gemini] ListModels failed: HTTP ${res.status}`);
+      return null;
+    }
+    const data = (await res.json()) as { models?: ListModelsEntry[] };
+    const list = (data.models ?? [])
+      .filter((m) =>
+        m.supportedGenerationMethods?.includes('generateContent'),
+      )
+      .map((m) => m.name.replace(/^models\//, ''))
+      .filter((n) => n.startsWith('gemini-') && /^gemini-\d/.test(n))
+      // 文字起こし用途に不適切なバリアント・重複バージョンを除外:
+      // -image / -tts / -computer-use / -customtools / 日付・リビジョンサフィックス
+      .filter((n) => !/-(image|tts|computer-use|customtools)/.test(n))
+      .filter((n) => !/-\d{3,4}$/.test(n))
+      .filter((n) => !/-\d{2}-\d{4}$/.test(n));
+    list.sort(compareModelVersions);
+    return list;
+  } catch (err) {
+    console.warn(`[gemini] ListModels fetch error: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+async function getCandidates(): Promise<string[]> {
   const override = process.env.GEMINI_MODEL_CANDIDATES;
   if (override) {
     return override
@@ -20,6 +94,22 @@ function getCandidates(): string[] {
       .map((s) => s.trim())
       .filter(Boolean);
   }
+
+  const now = Date.now();
+  if (modelsCache && now - modelsCache.fetchedAt < MODELS_TTL_MS) {
+    return modelsCache.models;
+  }
+
+  const dynamic = await fetchAvailableModels();
+  if (dynamic && dynamic.length > 0) {
+    modelsCache = { fetchedAt: now, models: dynamic };
+    console.log(
+      `[gemini] dynamic candidates (${dynamic.length}): ${dynamic.slice(0, 5).join(', ')}${dynamic.length > 5 ? ', ...' : ''}`,
+    );
+    return dynamic;
+  }
+
+  console.warn('[gemini] using static DEFAULT_CANDIDATES fallback');
   return [...DEFAULT_CANDIDATES];
 }
 
@@ -75,7 +165,7 @@ export async function generateWithFallback(
   input: GenerateInput,
 ): Promise<GenerateResult> {
   const client = getClient();
-  const candidates = getCandidates();
+  const candidates = await getCandidates();
   const errors: Array<{ model: string; error: string }> = [];
 
   for (const modelName of candidates) {
@@ -114,3 +204,4 @@ export async function generateWithFallback(
 }
 
 export { getCandidates as getGeminiCandidates };
+export { fetchAvailableModels as fetchGeminiAvailableModels };
