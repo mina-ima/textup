@@ -37,7 +37,10 @@ export function RetryTranscribeButton({
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body?.detail ?? `失敗: ${res.status}`);
+        const message =
+          body?.summary ?? body?.detail ?? `失敗しました（HTTP ${res.status}）`;
+        if (body?.detail) console.error('[transcribe] detail:', body.detail);
+        throw new Error(message);
       }
       toast.success('文字起こしが完了しました');
       router.refresh();

@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { recordingSessions } from '@/lib/db/schema';
 import { transcribeAudio } from '@/features/transcription/transcribeAudio';
+import { summarizeError } from '@/lib/error-messages';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -45,11 +46,9 @@ export async function POST(
     return NextResponse.json({ session: updated });
   } catch (err) {
     console.error('[transcribe] failed', err);
+    const { summary, category, detail } = summarizeError(err);
     return NextResponse.json(
-      {
-        error: 'Transcription failed',
-        detail: err instanceof Error ? err.message : String(err),
-      },
+      { error: 'Transcription failed', summary, category, detail },
       { status: 500 },
     );
   }

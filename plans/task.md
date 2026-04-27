@@ -99,13 +99,19 @@
 
 ## Phase 9: ListModels API による動的候補取得（2026-04-27 / v0.2.11）
 - [x] REST 直叩きで `v1beta/models` から動的取得（SDK に listModels 無し）
-- [x] `generateContent` 対応モデルのみ抽出、`-image` / `-tts` / `-computer-use` / `-customtools` / 日付・リビジョンサフィックスを除外
-- [x] バージョン降順ソート（major → minor → tier）+ preview/exp は降格
-- [x] プロセスメモリキャッシュ TTL 1h
+- [x] `generateContent` 対応モデルのみ抽出 + 不適切バリアント除外
+- [x] バージョン降順ソート、プロセスメモリ 1h キャッシュ
 - [x] 失敗時は静的 `DEFAULT_CANDIDATES` にフォールバック
-- [x] ローカル ListModels テストで 19→11 モデルへ絞り込み確認
+- [x] v0.2.11 デプロイ確認
+
+## Phase 10: エラーメッセージのユーザー向け要約（2026-04-27 / v0.2.12）
+- [x] `src/lib/error-messages.ts` 新規作成（`summarizeError()` ユーティリティ）
+- [x] エラーカテゴリ分類: quota_exhausted / rate_limited / overloaded / auth / permission / not_found / timeout / network / all_models_failed / unknown
+- [x] `All Gemini model candidates failed: [...]` から最後の inner error を再分類
+- [x] `/api/transcribe/[id]` と `/api/summarize/[id]` で `summary` / `category` / `detail` を返す
+- [x] `RetryTranscribeButton` / `GenerateSummaryButton` で `summary` を優先表示、`detail` は console
+- [x] ロジックの 7 ケース手動テスト全パス
 - [ ] 本番 Vercel にデプロイ
-- [ ] 本番ログでフォールバック挙動確認
 
 ## 今後の課題（次回以降）
 
@@ -116,8 +122,6 @@
 
 ### UI/UX
 - [ ] 一覧（dashboard）から「失敗」セッションの直接再実行
-- [ ] エラー詳細（Gemini のエラー原因）をユーザーに分かりやすく表示
-  - 現状: 生のスタックトレースがトーストに出る → 「API 無料枠超過」「一時的な高負荷」などの要約を出したい
 
 ### PWA
 - [ ] Android Chrome 実機動作確認（Phase 6 から持ち越し）

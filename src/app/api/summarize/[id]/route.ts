@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { recordingSessions, speakerMappings, summaries, transcripts } from '@/lib/db/schema';
 import { generateWithFallback } from '@/lib/gemini';
 import { buildSummaryPrompt } from '@/features/summary/promptBuilder';
+import { summarizeError } from '@/lib/error-messages';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -93,8 +94,9 @@ export async function POST(
     return NextResponse.json({ markdown: result.text, model: result.model });
   } catch (err) {
     console.error('[summarize] failed', err);
+    const { summary, category, detail } = summarizeError(err);
     return NextResponse.json(
-      { error: 'Summarization failed', detail: err instanceof Error ? err.message : String(err) },
+      { error: 'Summarization failed', summary, category, detail },
       { status: 500 },
     );
   }
