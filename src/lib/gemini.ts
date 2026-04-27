@@ -121,6 +121,27 @@ function getClient(): GoogleGenerativeAI {
   return new GoogleGenerativeAI(key);
 }
 
+// 429 エラーが Google RetryInfo を含む場合に秒数を抽出する。
+// 例: `"retryDelay": "5s"` / `retryDelay: 5s` / `retryDelay: "5.5s"` 等
+// 取得できなければ null。長すぎる遅延は ms 上限でクランプ。
+const MAX_RETRY_DELAY_MS = 30_000;
+
+export function parseRetryDelayMs(message: string): number | null {
+  const m = message.match(/retryDelay["'\s:]+([0-9]+(?:\.[0-9]+)?)s/i);
+  if (!m) return null;
+  const sec = parseFloat(m[1]);
+  if (!Number.isFinite(sec) || sec <= 0) return null;
+  return Math.min(Math.round(sec * 1000), MAX_RETRY_DELAY_MS);
+}
+
+function isRateLimitError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  return msg.includes('429') || msg.includes('rate limit');
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 // フォールバック対象とすべきエラーか判定
 function isFallbackError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
@@ -169,32 +190,50 @@ export async function generateWithFallback(
   const errors: Array<{ model: string; error: string }> = [];
 
   for (const modelName of candidates) {
-    try {
-      const model: GenerativeModel = client.getGenerativeModel({
-        model: modelName,
-        generationConfig: input.responseMimeType
-          ? { responseMimeType: input.responseMimeType }
-          : undefined,
-        systemInstruction: input.systemInstruction,
-      });
+    const model: GenerativeModel = client.getGenerativeModel({
+      model: modelName,
+      generationConfig: input.responseMimeType
+        ? { responseMimeType: input.responseMimeType }
+        : undefined,
+      systemInstruction: input.systemInstruction,
+    });
+    const contents: Part[] = [
+      { text: input.prompt },
+      ...(input.parts ?? []),
+    ];
 
-      const contents: Part[] = [
-        { text: input.prompt },
-        ...(input.parts ?? []),
-      ];
-      const result = await model.generateContent(contents);
-      const text = result.response.text();
-      console.log(`[gemini] success with model: ${modelName}`);
-      return { text, model: modelName };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      errors.push({ model: modelName, error: msg });
-      if (isFallbackError(err)) {
-        console.warn(`[gemini] fallback from ${modelName}: ${msg}`);
-        continue;
+    // 同モデルで最大 2 回（初回 + retryDelay 待ち再試行）試行する。
+    // 429 で retryDelay が取れたときだけ待機 → 再試行。それ以外は即フォールバック。
+    let attempt = 0;
+    while (attempt < 2) {
+      try {
+        const result = await model.generateContent(contents);
+        const text = result.response.text();
+        console.log(
+          `[gemini] success with model: ${modelName}${attempt > 0 ? ' (after retry)' : ''}`,
+        );
+        return { text, model: modelName };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const delayMs =
+          attempt === 0 && isRateLimitError(err)
+            ? parseRetryDelayMs(msg)
+            : null;
+        if (delayMs !== null) {
+          console.warn(
+            `[gemini] 429 on ${modelName}, waiting ${delayMs}ms then retrying once`,
+          );
+          await sleep(delayMs);
+          attempt += 1;
+          continue;
+        }
+        errors.push({ model: modelName, error: msg });
+        if (isFallbackError(err)) {
+          console.warn(`[gemini] fallback from ${modelName}: ${msg}`);
+          break; // 次のモデルへ
+        }
+        throw err;
       }
-      // フォールバック対象外のエラー（認証エラーなど）は即座に投げる
-      throw err;
     }
   }
 

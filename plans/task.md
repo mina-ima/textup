@@ -111,13 +111,21 @@
 - [x] `/api/transcribe/[id]` と `/api/summarize/[id]` で `summary` / `category` / `detail` を返す
 - [x] `RetryTranscribeButton` / `GenerateSummaryButton` で `summary` を優先表示、`detail` は console
 - [x] ロジックの 7 ケース手動テスト全パス
+- [x] v0.2.12 デプロイ確認
+
+## Phase 11: 429 retryDelay 尊重 + 同モデル限定再試行（2026-04-27 / v0.2.13）
+- [x] `parseRetryDelayMs()` 実装（Google RetryInfo の `retryDelay: "Ns"` を抽出）
+- [x] 上限 30 秒でクランプ、0/負/未取得は null（即フォールバック）
+- [x] `generateWithFallback` を「同モデル最大 2 回試行」ループに変更
+  - 初回 429 + retryDelay 取得可能 → sleep 後に同モデル再試行 1 回
+  - 再試行も失敗 or retryDelay 無し → 既存どおり次候補へフォールバック
+- [x] 8 ケース手動テスト全パス（実 Gemini エラー文字列含む）
 - [ ] 本番 Vercel にデプロイ
 
 ## 今後の課題（次回以降）
 
 ### 文字起こし系
-- [ ] Gemini 429 の `retryDelay` を尊重して指数バックオフ付きリトライを実装
-- [ ] 再実行中の重複 POST 防止（現状は `busy` state のみ、サーバー側で `processing` 中の rate limit は未実装）
+- [ ] 再実行中の重複 POST 防止（サーバー側で `processing` 中の rate limit）
 - [ ] retry count / 履歴の可視化
 
 ### UI/UX
