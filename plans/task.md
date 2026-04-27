@@ -135,12 +135,18 @@
 - [x] `audioBlobUrl` 無し（録音前段階の失敗）には表示しない
 - [x] 既存 `RetryTranscribeButton` を再利用（`label="再実行"`）
 - [x] モバイル幅対策で `flex-wrap` を追加
+- [x] v0.2.15 デプロイ確認
+
+## Phase 14: retry count / 履歴の可視化（2026-04-27 / v0.2.16）
+- [x] `recordingSessions` に 3 列追加: `retry_count` / `last_error_category` / `last_error_at`
+- [x] drizzle migration 0001 生成 + 本番 Neon に適用
+- [x] `transcribeAudio` で成功時にリセット、失敗時にカテゴリ + 時刻 + count++
+- [x] 詳細ページの失敗ブロックにカテゴリ別文言と再試行情報を表示
+- [x] dashboard カードに「再試行 N 回」バッジ（失敗時のみ）
+- [x] drizzle.config.ts に dotenv 明示読み込み追加（`.env.local` 対応）
 - [ ] 本番 Vercel にデプロイ
 
 ## 今後の課題（次回以降）
-
-### 文字起こし系
-- [ ] retry count / 履歴の可視化
 
 ### PWA
 - [ ] Android Chrome 実機動作確認（Phase 6 から持ち越し）

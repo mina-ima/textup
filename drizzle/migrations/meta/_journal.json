@@ -8,6 +8,13 @@
       "when": 1777006850701,
       "tag": "0000_bright_adam_warlock",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777277696615,
+      "tag": "0001_wide_young_avengers",
+      "breakpoints": true
     }
   ]
 }

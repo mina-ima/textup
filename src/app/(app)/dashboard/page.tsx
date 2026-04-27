@@ -90,6 +90,11 @@ export default async function DashboardPage() {
                   </Link>
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     <Badge variant={status.variant}>{status.label}</Badge>
+                    {item.retryCount > 0 && item.status === 'failed' && (
+                      <Badge variant="outline" className="text-xs">
+                        再試行 {item.retryCount} 回
+                      </Badge>
+                    )}
                     {item.status === 'failed' && item.audioBlobUrl && (
                       <RetryTranscribeButton
                         sessionId={item.id}

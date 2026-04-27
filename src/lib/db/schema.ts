@@ -60,6 +60,10 @@ export const recordingSessions = pgTable('recording_sessions', {
   audioMimeType: text('audio_mime_type'),
   gainValue: integer('gain_value').notNull().default(1),   // 録音時のゲイン設定を保存
   recordingMode: text('recording_mode').notNull().default('meeting'), // 対面/会議室/講義/web
+  // 文字起こし再試行の追跡（成功するまでの累積。成功で 0 にリセット）
+  retryCount: integer('retry_count').notNull().default(0),
+  lastErrorCategory: text('last_error_category'),
+  lastErrorAt: timestamp('last_error_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (t) => ({

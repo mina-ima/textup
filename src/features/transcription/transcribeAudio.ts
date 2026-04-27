@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { generateWithFallback } from '@/lib/gemini';
 import { db } from '@/lib/db';
 import { recordingSessions, transcripts, speakerMappings } from '@/lib/db/schema';
+import { summarizeError } from '@/lib/error-messages';
 
 const TRANSCRIBE_PROMPT = `添付の音声を日本語で文字起こししてください。
 
@@ -153,11 +154,15 @@ export async function transcribeAudio(sessionId: string): Promise<void> {
       await db.insert(speakerMappings).values(newMappings);
     }
 
+    // 成功 — retry 関連フィールドはリセット
     await db
       .update(recordingSessions)
       .set({
         status: 'ready',
         updatedAt: new Date(),
+        retryCount: 0,
+        lastErrorCategory: null,
+        lastErrorAt: null,
       })
       .where(eq(recordingSessions.id, sessionId));
   } catch (err) {
@@ -166,11 +171,18 @@ export async function transcribeAudio(sessionId: string): Promise<void> {
       error: err instanceof Error ? err.message : String(err),
       stack: err instanceof Error ? err.stack : undefined,
     });
+    const { category } = summarizeError(err);
     // Gemini の一時エラー（ネットワーク / 429 / 一時的な内部エラー）は「詰まり」として扱い、
     // status を processing のまま残さず failed にしてユーザーが再実行できるようにする。
     await db
       .update(recordingSessions)
-      .set({ status: 'failed', updatedAt: new Date() })
+      .set({
+        status: 'failed',
+        updatedAt: new Date(),
+        retryCount: (session.retryCount ?? 0) + 1,
+        lastErrorCategory: category,
+        lastErrorAt: new Date(),
+      })
       .where(eq(recordingSessions.id, sessionId));
     throw err;
   }

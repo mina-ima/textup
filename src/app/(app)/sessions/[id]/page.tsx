@@ -13,6 +13,7 @@ import { StatusPoller } from '@/components/session/StatusPoller';
 import { TranscriptList } from '@/components/session/TranscriptList';
 import { RetryTranscribeButton } from '@/components/session/RetryTranscribeButton';
 import { DeleteSessionButton } from '@/components/session/DeleteSessionButton';
+import { getCategorySummary, type ErrorCategory } from '@/lib/error-messages';
 
 export const dynamic = 'force-dynamic';
 
@@ -115,8 +116,24 @@ export default async function SessionPage({
             </div>
           )}
           {item.status === 'failed' && (
-            <div className="text-sm text-destructive">
-              文字起こしに失敗しました。再実行するか、時間をおいて再度お試しください。
+            <div className="space-y-1 text-sm">
+              <p className="text-destructive">
+                {item.lastErrorCategory
+                  ? getCategorySummary(item.lastErrorCategory as ErrorCategory)
+                  : '文字起こしに失敗しました。再実行するか、時間をおいて再度お試しください。'}
+              </p>
+              {item.retryCount > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  再試行回数: {item.retryCount} 回
+                  {item.lastErrorAt &&
+                    `（最終: ${new Intl.DateTimeFormat('ja-JP', {
+                      month: 'numeric',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    }).format(new Date(item.lastErrorAt))}）`}
+                </p>
+              )}
             </div>
           )}
           {isEmptyReady && (
