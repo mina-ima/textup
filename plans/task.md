@@ -160,5 +160,66 @@
 
 ## 今後の課題（次回以降）
 
-### PWA
+### 次回開発再開時の最初のアクション
+
+1. **本番で 2.5-pro が実際に使われているか確認**
+   - Vercel ダッシュボード → textup プロジェクト → Functions → Logs
+   - `[gemini] success with model:` を検索
+   - `gemini-2.5-pro` で成功している割合を観測（本日 v0.2.17 デプロイ後の傾向）
+2. **新規録音で精度の体感検証**
+   - 固有名詞・専門用語の取り違えが減ったか
+   - 失敗時に「再試行 N 回」バッジと「○○の理由で失敗しました」のサマリが正しく出るか
+3. **Phase 6 持ち越しの Android Chrome 実機 PWA 動作確認**
+   - インストール / オフライン挙動 / WakeLock / マイク許可
+   - ユーザー手元の Android 端末で `https://textup-five.vercel.app` を開いて検証
+
+### Phase 16 候補（精度改善の続き）
+
+体感的に精度がまだ足りない場合の打ち手（優先度順）:
+- [ ] **プロンプト調整**: 専門用語辞書、話者数ヒント、ドメイン特化指示
+- [ ] **後処理パス**: Gemini で 1 度文字起こし → 別モデル/プロンプトで校正パス（2 段推論）
+- [ ] **音声前処理強化**: ノイズ除去ライブラリの導入（`@ffmpeg/ffmpeg` ブラウザ実行）
+- [ ] **2.5-pro 専用モード**: ユーザーが UI で「精度優先 / 速度優先」を切替
+
+### Phase 17 候補（運用観点）
+
+- [ ] dashboard でセッションごとの **使用モデル**バッジ表示（DB に最終成功モデルを保存）
+- [ ] 月次の Gemini API 使用量ダッシュボード（Vercel ログ → 集計）
+- [ ] 録音時間の上限通知（Vercel Functions の maxDuration=300 に近い場合に警告）
+
+### 残課題（既存）
+
 - [ ] Android Chrome 実機動作確認（Phase 6 から持ち越し）
+
+## 本日（2026-04-27）の成果サマリ
+
+| Phase | バージョン | 内容 |
+|---|---|---|
+| 8 | v0.2.10 | Gemini 候補モデル順を実在優先に整理 |
+| 9 | v0.2.11 | ListModels API による動的候補取得 |
+| 10 | v0.2.12 | エラーメッセージのユーザー向け要約 |
+| 11 | v0.2.13 | 429 retryDelay 尊重 + 同モデル限定再試行 |
+| 12 | v0.2.14 | 重複 POST 防止 + stuck 自動解除 |
+| 13 | v0.2.15 | dashboard から失敗の直接再実行 |
+| 14 | v0.2.16 | retry_count / last_error の DB 記録 + UI 表示 |
+| 15 | v0.2.17 | preview/exp 除外、2.5-pro を 1 段目に |
+
+## 開発再開コマンド集
+
+```bash
+cd ~/AI/textup
+pnpm dev                                                    # ローカル開発 (http://localhost:3000)
+pnpm build                                                  # 本番ビルド検証
+git push origin main                                        # 自動デプロイ (Vercel)
+node node_modules/drizzle-kit/bin.cjs migrate              # Neon に migration 適用
+node node_modules/drizzle-kit/bin.cjs generate             # schema 変更後の migration 生成
+vercel ls --scope js-projects-675c46e3 textup | head -7     # 直近のデプロイ確認
+```
+
+## 現状の本番情報
+
+- 本番 URL: `https://textup-five.vercel.app`
+- Vercel: `js-projects-675c46e3/textup`
+- 現バージョン: **v0.2.17**
+- DB: Neon Postgres（`recording_sessions` に retry_count 等 3 列追加済み）
+- 動的モデル候補: `gemini-2.5-pro` → `gemini-2.5-flash` → `2.5-flash-lite` → `2.0-flash` → `2.0-flash-lite`
