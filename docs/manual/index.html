@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>textup（文字起こし・要約）取扱説明書</title>
+<style>
+:root{--fg:#1a1a1a;--muted:#666;--accent:#2563eb;--bg:#fff;--code:#f4f4f5;--border:#e5e7eb}*{box-sizing:border-box}body{font-family:-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;line-height:1.8;color:var(--fg);background:var(--bg);max-width:820px;margin:0 auto;padding:24px 18px}h1{font-size:1.7rem;border-bottom:3px solid var(--accent);padding-bottom:.4em;margin-top:0}h2{font-size:1.3rem;margin-top:2em;border-left:5px solid var(--accent);padding-left:.5em}h3{font-size:1.1rem;margin-top:1.5em}code{background:var(--code);padding:.15em .4em;border-radius:4px;font-size:.9em}pre{background:var(--code);padding:14px;border-radius:8px;overflow-x:auto}pre code{background:none;padding:0}table{border-collapse:collapse;width:100%;margin:1em 0}th,td{border:1px solid var(--border);padding:8px 10px;text-align:left}th{background:#f8fafc}blockquote{border-left:4px solid var(--accent);background:#f0f6ff;margin:1em 0;padding:.6em 1em;color:#334}a{color:var(--accent)}footer{margin-top:3em;padding-top:1em;border-top:1px solid var(--border);color:var(--muted);font-size:.85rem}@media(max-width:600px){body{padding:16px 12px}h1{font-size:1.4rem}}
+</style>
+</head>
+<body>
+<h1>textup（文字起こし・要約）取扱説明書</h1>
+<blockquote>会議や講義の音声を録音すると、AIが自動で文字起こしし、さらに要約まで作成してくれるアプリです。</blockquote>
+
+<h2>このアプリでできること</h2>
+<ul>
+<li>マイクで会議・講義などの音声を録音します。</li>
+<li>録音した音声をAIが文字起こし（テキスト化）します。</li>
+<li>文字起こし結果から、AIが要約（議事録風のまとめ）を作成します。</li>
+<li>話者ごとの編集（話者名の修正など）ができます。</li>
+<li>文字起こしに失敗した場合に再実行できます。</li>
+<li>セッション（録音1回分）ごとに結果を保存し、後から見返せます。</li>
+<li>スマートフォンでもアプリのように使える（PWA・ホーム画面に追加可能）。</li>
+</ul>
+<p>※ 文字起こしの精度や対応言語、対応する録音時間の上限などの詳細は未確認です。重要な記録は元音声や人の確認も併用してください。</p>
+
+<h2>想定ユーザー・利用シーン</h2>
+<ul>
+<li>会議の議事録作成を効率化したいビジネス利用者。</li>
+<li>講義・セミナーの内容を記録・要約して復習したい人。</li>
+<li>取材・打ち合わせのメモ取りを音声から自動化したい人。</li>
+</ul>
+
+<h2>動作環境・前提</h2>
+<ul>
+<li>マイクが使えるパソコン・スマートフォンのWebブラウザ（最新版の Chrome などを推奨）。</li>
+<li>マイクの使用許可が必要です。</li>
+<li>インターネット接続。</li>
+<li>ログイン（サインイン）が必要です。</li>
+<li>AIによる文字起こし・要約に Google の Gemini API を利用します。</li>
+</ul>
+
+<h2>セットアップ</h2>
+<p>通常の利用者は、公開URLにアクセスしてログインするだけで利用できます。スマートフォンでは、ブラウザの「ホーム画面に追加」でアプリのように使えます。</p>
+<p>開発者がローカルで動かす場合は「開発者向けメモ」を参照してください。</p>
+
+<h2>使い方（ステップbyステップ）</h2>
+<ol>
+<li>アプリのURLを開き、サインインします。</li>
+<li>ダッシュボードから新しい録音（セッション）を開始します。</li>
+<li>初回はブラウザからマイクの使用許可を求められるので「許可」します。</li>
+<li>録音設定（必要に応じて）を確認し、録音を開始します。音声レベルメーターで入力を確認できます。</li>
+<li>会議・講義が終わったら録音を停止します。音声が文字起こし処理に送られます。</li>
+<li>しばらく待つと文字起こし結果（発言一覧）が表示されます。状態は自動で更新されます。</li>
+<li>必要なら話者名を編集したり、失敗した部分を再実行します。</li>
+<li>「要約を作成」を実行すると、AIが内容をまとめた要約を生成します。</li>
+<li>結果はセッションとして保存され、あとから一覧で見返せます。</li>
+</ol>
+
+<h2>主な機能</h2>
+<ul>
+<li><strong>録音</strong>: ブラウザのマイクで録音し、WAV形式にエンコード。音声レベルメーター付き。</li>
+<li><strong>文字起こし</strong>: 録音音声をAIでテキスト化。失敗時の再実行に対応。</li>
+<li><strong>要約生成</strong>: 文字起こし結果からAIが要約（Markdown表示）。</li>
+<li><strong>話者編集</strong>: 話者名などを編集するダイアログ。</li>
+<li><strong>セッション管理</strong>: 録音ごとに結果を保存し、状態を自動更新（ポーリング）。</li>
+<li><strong>PWA対応</strong>: ホーム画面追加・サービスワーカー登録に対応。</li>
+</ul>
+
+<h2>よくある質問・トラブルシューティング</h2>
+<ul>
+<li><strong>Q. 録音できません。</strong> → ブラウザのマイク使用許可を確認してください。許可をブロックしている場合は設定から解除します。</li>
+<li><strong>Q. 文字起こしが終わりません。</strong> → 処理に時間がかかる場合があります。状態表示が更新されるのを待ち、失敗時は再実行ボタンを使ってください。</li>
+<li><strong>Q. 要約がうまく出ません。</strong> → 文字起こし結果が短い・不正確だと要約も影響を受けます。録音環境（雑音）を見直してください。</li>
+<li><strong>Q. AIの無料枠でエラーになります。</strong> → 利用モデルは自動でフォールバックする設計です。時間をおいて再実行してください。</li>
+<li><strong>Q. スマホでアプリのように使いたい。</strong> → ブラウザの「ホーム画面に追加」を利用してください（PWA対応）。</li>
+</ul>
+
+<h2>開発者向けメモ（技術スタック／起動コマンド／ビルド／デプロイ先）</h2>
+<ul>
+<li><strong>技術スタック</strong>: Next.js 16（App Router） / React 19 / TypeScript / Tailwind CSS v4 / shadcn・@base-ui・lucide-react・sonner（UI） / NextAuth v5（認証） / Drizzle ORM + Neon（@neondatabase/serverless、DB） / Vercel Blob（音声ファイル保管） / Google Gemini API（@google/generative-ai、文字起こし・要約） / react-markdown・remark-gfm（要約表示） / zod（検証）。</li>
+<li><strong>パッケージマネージャー</strong>: pnpm。</li>
+<li><strong>主なディレクトリ</strong>: <code>src/app/</code>（画面・APIルート、<code>(app)</code>/<code>(auth)</code> グループ）, <code>src/features/</code>（recording・transcription・summary）, <code>src/components/</code>（recorder・session・layout など）, <code>src/lib/</code>（gemini・auth・db）。</li>
+<li><strong>Geminiモデル</strong>: ListModels API で動的にモデルを選定し、失敗時は静的候補（gemini-3.0-flash 等）へフォールバック。</li>
+<li><strong>環境変数</strong>: <code>.env.local</code> に Gemini APIキー、データベース接続、Vercel Blob、NextAuth 設定などが必要。<code>drizzle.config.ts</code> でマイグレーション管理。</li>
+</ul>
+<p>起動（開発）:</p>
+<pre><code>pnpm install
+pnpm dev
+# http://localhost:3000</code></pre>
+<p>ビルド／本番起動:</p>
+<pre><code>pnpm build
+pnpm start</code></pre>
+<ul>
+<li><strong>デプロイ先</strong>: Vercel（プロジェクト名 <code>textup</code>）。本番URLは Vercel ダッシュボードで確認（未確認のためここには記載しない）。</li>
+<li><strong>バージョン</strong>: package.json 上 v0.2.17。</li>
+<li><strong>補足</strong>: 本リポジトリの Next.js は通常の知識と異なる破壊的変更を含むため、改修時は <code>node_modules/next/dist/docs/</code> を参照のこと（AGENTS.md 参照）。</li>
+</ul>
+
+<footer>この取扱説明書は自動生成されました。</footer>
+</body>
+</html>
